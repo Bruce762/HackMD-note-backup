@@ -1,6 +1,6 @@
-# HackMD 備份與圖片下載工具
+# HackMD 備份圖片下載工具
 
-將 HackMD 筆記單向備份到本機，接著自動下載 Markdown 內的圖片、改成本機連結，並依第一個 tag 整理筆記。
+將 HackMD 筆記單向備份到本機，接著自動下載 Markdown 內的圖片、改成本機連結，並依第一個 tag 整理筆記。程式會記錄已備份的筆記，只有內容更新時才再次備份。
 
 - 不會新增、修改或刪除 HackMD 上的筆記。
 - 只需要 Python 3，不必安裝第三方套件。
@@ -9,7 +9,7 @@
 
 ## 1. 設定 HackMD token
 
-在 HackMD Settings 的 API 頁面建立 token：
+HackMD token 取得方法：
 
 ![HackMD API token 設定頁面](image/README/1792827057526.png)
 
@@ -83,7 +83,7 @@ raw_hackmd/
 ## 單獨處理既有 Markdown
 
 如果已有從 HackMD 匯出的資料夾，也可以只執行圖片下載程式：
-
+先從 HackMD 下載筆記：
 ![HackMD 匯出筆記](image/README/1792827168857.png)
 
 ```bash
