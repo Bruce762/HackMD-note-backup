@@ -80,6 +80,18 @@ raw_hackmd/
 - 圖片會先嘗試匿名下載；匿名失敗且網址屬於 HackMD 時，才使用 token。
 - 若圖片下載失敗，畫面會列出網址、錯誤原因及引用它的 Markdown 檔案。
 
+### HackMD 免費方案 API 限制
+
+免費方案每月可呼叫 API 400 次，每 5 分鐘最多 100 次，最多可建立 10 組 Token。實際限制以 HackMD 設定頁面為準。
+
+若出現 `HTTP 429 Too Many Requests`，請等待至少 5 分鐘後重新執行：
+
+```bash
+python3 backup_hackmd.py
+```
+
+程式會接續先前進度，只重試失敗或有變更的筆記，不會從頭下載。
+
 ## 單獨處理既有 Markdown
 
 如果已有從 HackMD 匯出的資料夾，也可以只執行圖片下載程式：
