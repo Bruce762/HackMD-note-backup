@@ -29,11 +29,11 @@ HACKMD_TOKEN=你的token
 python3 backup_hackmd.py
 ```
 
-程式會依序：
+程式會：
 
-1. 從 HackMD 增量備份筆記。
-2. 依第一個 tag 整理 Markdown。
-3. 下載遠端圖片並改成本機相對路徑。
+1. 從 HackMD 增量備份筆記；每完成一篇，就立即在背景下載該篇的圖片。
+2. 主程式同時繼續下載後續 Markdown，不會等全部筆記完成才開始圖片。
+3. 全部完成後，依第一個 tag 整理 Markdown，並把圖片連結改成本機相對路徑。
 4. 修正程式碼區塊的語言標記，例如將 `cpp=` 改成 `cpp`。
 
 只預覽、不寫入檔案：
@@ -58,9 +58,10 @@ python3 backup_hackmd.py --no-images
 raw_hackmd/
 ├── personal/
 │   ├── Coding/
-│   │   └── 筆記名稱--shortId.md
+│   │   ├── 筆記名稱.md
+│   │   └── 同名筆記 (2).md
 │   └── image/
-│       └── 筆記名稱--shortId/
+│       └── 筆記名稱/
 ├── teams/
 │   └── 團隊名稱/
 └── .hackmd-backup.json
@@ -68,16 +69,22 @@ raw_hackmd/
 
 - 有 tag：Markdown 放在第一個 tag 的資料夾。
 - 沒有 tag：Markdown 留在 `personal/` 或所屬 team 的根目錄。
+- 每篇 Markdown 尾端會加入 `<!-- hackmd-id: ... -->`，程式只靠這個 ID 辨識筆記。
+- 同一資料夾有同名筆記時，檔名會自動加上 `(2)`、`(3)`。
+- 可自行修改 Markdown 檔名；下次備份仍會依檔內 ID 找到原筆記。
 - 圖片放在同一組筆記旁的 `image/文件名稱/`。
 - 圖片已存在時會直接沿用，不會重複下載。
-- `.hackmd-backup.json` 是增量備份狀態，請勿手動修改或刪除。
+- `.hackmd-backup.json` 會記錄目前檔案路徑與增量備份狀態，請勿手動修改或刪除。
 
 ## API 使用方式
 
 - 每次先呼叫一次筆記清單 API。
 - 只有新增、變更或上次失敗的筆記，才另外抓取完整內容。
+- 每完成一篇筆記就會立即更新 `.hackmd-backup.json`，中斷後可接續備份。
 - 沒有任何筆記異動時，備份部分通常只使用 1 次 API 呼叫。
 - 圖片會先嘗試匿名下載；匿名失敗且網址屬於 HackMD 時，才使用 token。
+- Markdown 與圖片會重疊下載；畫面出現 `[圖片排程]` 後，該篇圖片已在背景處理。
+- 圖片下載成功後會立即保存在本機；中斷後重新執行會沿用既有圖片。
 - 若圖片下載失敗，畫面會列出網址、錯誤原因及引用它的 Markdown 檔案。
 
 ### HackMD 免費方案 API 限制

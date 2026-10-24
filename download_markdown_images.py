@@ -545,9 +545,38 @@ def normalize_hackmd_code_fences(text: str) -> tuple[str, int]:
     return "".join(output), changed
 
 
-def build_plans(root: Path, image_dir_name: Path) -> list[DocumentPlan]:
+def markdown_paths(root: Path, selected: Iterable[str] | None = None) -> list[Path]:
+    """回傳要處理的 Markdown。
+
+    ``selected`` 供備份程式在單篇筆記寫入後立即啟動圖片下載；
+    路徑一律限制在 root 內，避免誤處理備份目錄外的檔案。
+    """
+    if selected is None:
+        return sorted(root.rglob("*.md"))
+
+    paths: list[Path] = []
+    for value in selected:
+        candidate = Path(value).expanduser()
+        path = candidate.resolve() if candidate.is_absolute() else (root / candidate).resolve()
+        try:
+            path.relative_to(root)
+        except ValueError as error:
+            raise ValueError(f"--file 必須位於備份目錄內：{value}") from error
+        if path.suffix.lower() != ".md":
+            raise ValueError(f"--file 只能指定 Markdown：{value}")
+        if not path.is_file():
+            raise ValueError(f"--file 找不到檔案：{value}")
+        paths.append(path)
+    return sorted(set(paths))
+
+
+def build_plans(
+    root: Path,
+    image_dir_name: Path,
+    selected: Iterable[str] | None = None,
+) -> list[DocumentPlan]:
     plans: list[DocumentPlan] = []
-    for path in sorted(root.rglob("*.md")):
+    for path in markdown_paths(root, selected):
         try:
             text = path.read_text(encoding="utf-8")
         except UnicodeDecodeError as error:
@@ -571,9 +600,9 @@ def build_plans(root: Path, image_dir_name: Path) -> list[DocumentPlan]:
     return plans
 
 
-def build_move_plans(root: Path) -> list[MovePlan]:
+def build_move_plans(root: Path, selected: Iterable[str] | None = None) -> list[MovePlan]:
     moves: list[MovePlan] = []
-    for path in sorted(root.rglob("*.md")):
+    for path in markdown_paths(root, selected):
         try:
             tags = frontmatter_tags(path.read_text(encoding="utf-8"))
         except UnicodeDecodeError:
@@ -676,6 +705,17 @@ def parse_args(argv: Iterable[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--retries", type=int, default=2, help="下載失敗後重試次數（預設：2）")
     parser.add_argument("--max-size-mb", type=int, default=100, help="單張圖片大小上限（預設：100 MiB）")
     parser.add_argument("--overwrite", action="store_true", help="重新下載已存在的圖片")
+    parser.add_argument(
+        "--file",
+        action="append",
+        default=None,
+        help="只處理指定的 Markdown（可重複指定，相對路徑以備份根目錄為基準）",
+    )
+    parser.add_argument(
+        "--download-only",
+        action="store_true",
+        help="只下載圖片，不搬移或改寫 Markdown（供備份程式背景處理）",
+    )
     backup_group = parser.add_mutually_exclusive_group()
     backup_group.add_argument(
         "--backup",
@@ -757,8 +797,12 @@ def main(argv: Iterable[str] | None = None) -> int:
     environment_token = os.environ.get(args.token_env, "").strip() or None
     token = environment_token or dotenv_value(env_file, args.token_env)
     token_hosts = tuple(args.token_host or ["hackmd.io"])
-    plans = build_plans(root, image_dir_name)
-    moves = [] if args.no_organize else build_move_plans(root)
+    try:
+        plans = build_plans(root, image_dir_name, args.file)
+        moves = [] if args.no_organize or args.download_only else build_move_plans(root, args.file)
+    except ValueError as error:
+        print(f"錯誤：{error}", file=sys.stderr)
+        return 2
     jobs = {
         (url, destination)
         for plan in plans
@@ -830,6 +874,12 @@ def main(argv: Iterable[str] | None = None) -> int:
                     print(f"[{completed}/{len(jobs)} {status}] {key[0]} -> {result.path}")
                 else:
                     print(f"[{completed}/{len(jobs)} 失敗] {key[0]}：{result.error}", file=sys.stderr)
+
+    if args.download_only:
+        failed_jobs = sum(not result.ok for result in results.values())
+        successful_jobs = len(results) - failed_jobs
+        print(f"背景圖片下載完成：成功 {successful_jobs}/{len(jobs)}。")
+        return 1 if failed_jobs else 0
 
     moved_paths, move_failures = organize_documents(moves, backup=args.backup)
 
